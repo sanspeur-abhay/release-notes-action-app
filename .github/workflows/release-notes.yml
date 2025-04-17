@@ -19,36 +19,49 @@ jobs:
       
       - name: Get tag name
         id: get_tag
-        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        run: |
+          echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
 
       - name: Get previous tag
         id: prev_tag
         run: |
-          echo "PREV_TAG=$(git describe --tags --abbrev=0 ${{ steps.get_tag.outputs.TAG_NAME }}^ || echo '')" >> $GITHUB_OUTPUT
+          git fetch --tags
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo '')
+          echo "tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
       
       - name: Generate release notes
-        id: release_notes
         run: |
-          if [ -n "${{ steps.prev_tag.outputs.PREV_TAG }}" ]; then
-            # If there's a previous tag, generate notes from previous tag to current
-            echo "NOTES<<EOF" >> $GITHUB_OUTPUT
-            echo "## What's Changed" >> $GITHUB_OUTPUT
-            git log --pretty=format:"* %s (%h)" ${{ steps.prev_tag.outputs.PREV_TAG }}..${{ steps.get_tag.outputs.TAG_NAME }} >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+          if [ -n "${{ steps.prev_tag.outputs.tag }}" ]; then
+            echo "## What's Changed" > RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            
+            # Features
+            echo "### ✨ Features" >> RELEASE_NOTES.md
+            git log --pretty=format:"* %s" ${{ steps.prev_tag.outputs.tag }}..${{ steps.get_tag.outputs.tag }} | grep -i "^* feat" >> RELEASE_NOTES.md || true
+            echo "" >> RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            
+            # Bug Fixes
+            echo "### 🐛 Bug Fixes" >> RELEASE_NOTES.md
+            git log --pretty=format:"* %s" ${{ steps.prev_tag.outputs.tag }}..${{ steps.get_tag.outputs.tag }} | grep -i "^* fix" >> RELEASE_NOTES.md || true
+            echo "" >> RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            
+            # Other Changes
+            echo "### 🔄 Other Changes" >> RELEASE_NOTES.md
+            git log --pretty=format:"* %s" ${{ steps.prev_tag.outputs.tag }}..${{ steps.get_tag.outputs.tag }} | grep -iv "^* feat\|^* fix" >> RELEASE_NOTES.md || true
           else
-            # If this is the first tag, generate notes from the beginning
-            echo "NOTES<<EOF" >> $GITHUB_OUTPUT
-            echo "## Initial Release" >> $GITHUB_OUTPUT
-            git log --pretty=format:"* %s (%h)" ${{ steps.get_tag.outputs.TAG_NAME }} >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            echo "## 🎉 Initial Release" > RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            git log --pretty=format:"* %s" ${{ steps.get_tag.outputs.tag }} >> RELEASE_NOTES.md
           fi
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ steps.get_tag.outputs.TAG_NAME }}
-          name: Release ${{ steps.get_tag.outputs.TAG_NAME }}
-          body: ${{ steps.release_notes.outputs.NOTES }}
+          tag_name: ${{ steps.get_tag.outputs.tag }}
+          name: Release ${{ steps.get_tag.outputs.tag }}
+          body_path: RELEASE_NOTES.md
           draft: false
           prerelease: false
         env:

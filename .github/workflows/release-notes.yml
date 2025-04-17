@@ -32,41 +32,71 @@ jobs:
       
       - name: Generate release notes
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Initialize the release notes file
           echo "# What's Changed" > RELEASE_NOTES.md
           echo "" >> RELEASE_NOTES.md
 
-          # Get merged PRs between tags
-          if [ -n "${{ steps.prev_tag.outputs.tag }}" ]; then
-            RANGE="${{ steps.prev_tag.outputs.tag }}..${{ steps.get_tag.outputs.tag }}"
-          else
-            RANGE="${{ steps.get_tag.outputs.tag }}"
-          fi
+          # Function to fetch PRs with specific labels
+          fetch_prs_by_label() {
+            local label=$1
+            gh pr list \
+              --repo $GITHUB_REPOSITORY \
+              --state merged \
+              --json number,title,labels,mergedAt \
+              --search "label:$label merged:${{ steps.prev_tag.outputs.tag }}..HEAD" \
+              --limit 100
+          }
 
-          # Get all PRs merged in this range
-          MERGED_PRS=$(gh pr list --search "is:merged merged:>${{ steps.prev_tag.outputs.tag }}" --json number,title,labels,mergeCommit)
-
-          # Initialize sections
+          # Features Section
           echo "## ✨ Features" >> RELEASE_NOTES.md
           echo "" >> RELEASE_NOTES.md
-          echo "$MERGED_PRS" | jq -r '.[] | select(.labels[].name == "feature" or .labels[].name == "enhancement") | "* \(.title) (#\(.number))"' >> RELEASE_NOTES.md || true
+          {
+            # Fetch PRs with feature or enhancement labels
+            feature_prs=$(fetch_prs_by_label "feature")
+            enhancement_prs=$(fetch_prs_by_label "enhancement")
+            
+            # Combine and format feature PRs
+            echo "$feature_prs $enhancement_prs" | jq -r '.[] | "* \(.title) (#\(.number))"' || true
+          } >> RELEASE_NOTES.md
           echo "" >> RELEASE_NOTES.md
 
+          # Bug Fixes Section
           echo "## 🐛 Bug Fixes" >> RELEASE_NOTES.md
           echo "" >> RELEASE_NOTES.md
-          echo "$MERGED_PRS" | jq -r '.[] | select(.labels[].name == "bug" or .labels[].name == "bugfix") | "* \(.title) (#\(.number))"' >> RELEASE_NOTES.md || true
+          {
+            # Fetch PRs with bug or fix labels
+            bug_prs=$(fetch_prs_by_label "bug")
+            fix_prs=$(fetch_prs_by_label "fix")
+            
+            # Combine and format bug fix PRs
+            echo "$bug_prs $fix_prs" | jq -r '.[] | "* \(.title) (#\(.number))"' || true
+          } >> RELEASE_NOTES.md
           echo "" >> RELEASE_NOTES.md
 
+          # Other Changes Section
           echo "## 🔄 Other Changes" >> RELEASE_NOTES.md
           echo "" >> RELEASE_NOTES.md
-          echo "$MERGED_PRS" | jq -r '.[] | select(all(.labels[].name; . != "feature" and . != "enhancement" and . != "bug" and . != "fix")) | "* \(.title) (#\(.number))"' >> RELEASE_NOTES.md || true
+          {
+            # Get all merged PRs and exclude those with feature/bug labels
+            gh pr list \
+              --repo $GITHUB_REPOSITORY \
+              --state merged \
+              --json number,title,labels,mergedAt \
+              --search "merged:${{ steps.prev_tag.outputs.tag }}..HEAD -label:feature -label:enhancement -label:bug -label:fix" \
+              --limit 100 | \
+            jq -r '.[] | "* \(.title) (#\(.number))"' || true
+          } >> RELEASE_NOTES.md
 
-          # If no PRs found, add a note
-          if [ ! -s RELEASE_NOTES.md ]; then
-            echo "No changes found in this release." >> RELEASE_NOTES.md
+          # Check if any content was added
+          if ! grep -q "[*]" RELEASE_NOTES.md; then
+            echo "No pull requests found for this release." >> RELEASE_NOTES.md
           fi
+
+          # Add link to full changelog
+          echo "" >> RELEASE_NOTES.md
+          echo "**Full Changelog**: https://github.com/$GITHUB_REPOSITORY/compare/${{ steps.prev_tag.outputs.tag }}...${{ steps.get_tag.outputs.tag }}" >> RELEASE_NOTES.md
 
       - name: Create Release
         uses: softprops/action-gh-release@v1

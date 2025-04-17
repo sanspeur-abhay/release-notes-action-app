@@ -1,80 +1,48 @@
-name: Generate Release Notes
+name: Categorized Release Notes on Tag
 
 on:
   push:
     tags:
-      - 'v*' # Trigger on version tags
+      - 'v*'
 
 jobs:
-  create-release:
+  create_categorized_release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # Required for creating releases
-      pull-requests: read # Required for reading PRs and their labels
-    
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
+
+      - name: Generate and publish categorized release
+        uses: release-drafter/release-drafter@v6
         with:
-          fetch-depth: 0 # Fetch all history for generating release notes
-      
-      - name: Get tag name
-        id: get_tag
-        run: |
-          echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          tag: ${{ github.ref_name }}
+          config: |
+            name-template: 'v$NEXT_PATCH_VERSION'
+            tag-template: 'v$NEXT_PATCH_VERSION'
 
-      - name: Get previous tag
-        id: prev_tag
-        run: |
-          git fetch --tags
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo '')
-          echo "tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
-      
-      - name: Generate release notes
+            categories:
+              - title: '🚀 Features'
+                labels:
+                  - 'feature'
+              - title: '🐛 Bug Fixes'
+                labels:
+                  - 'bugfix'
+              - title: '🔧 Other Changes'
+                labels:
+                  - 'chore'
+                  - 'refactor'
+                  - 'style'
+                  - 'test'
+
+            change-template: '- $TITLE (#$NUMBER)'
+            no-changes-template: '- No significant changes'
+
+            template: |
+              ## What’s Changed
+
+              $CHANGES
+
+              **Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREVIOUS_TAG...$NEXT_TAG
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Initialize the release notes file
-          echo "# What's Changed" > RELEASE_NOTES.md
-          echo "" >> RELEASE_NOTES.md
-
-          # Get merged PRs between tags
-          if [ -n "${{ steps.prev_tag.outputs.tag }}" ]; then
-            RANGE="${{ steps.prev_tag.outputs.tag }}..${{ steps.get_tag.outputs.tag }}"
-          else
-            RANGE="${{ steps.get_tag.outputs.tag }}"
-          fi
-
-          # Get all PRs merged in this range
-          MERGED_PRS=$(gh pr list --search "is:merged merged:>${{ steps.prev_tag.outputs.tag }}" --json number,title,labels,mergeCommit)
-
-          # Initialize sections
-          echo "## ✨ Features" >> RELEASE_NOTES.md
-          echo "" >> RELEASE_NOTES.md
-          echo "$MERGED_PRS" | jq -r '.[] | select(.labels[].name == "feature" or .labels[].name == "enhancement") | "* \(.title) (#\(.number))"' >> RELEASE_NOTES.md || true
-          echo "" >> RELEASE_NOTES.md
-
-          echo "## 🐛 Bug Fixes" >> RELEASE_NOTES.md
-          echo "" >> RELEASE_NOTES.md
-          echo "$MERGED_PRS" | jq -r '.[] | select(.labels[].name == "bug" or .labels[].name == "bugfix") | "* \(.title) (#\(.number))"' >> RELEASE_NOTES.md || true
-          echo "" >> RELEASE_NOTES.md
-
-          echo "## 🔄 Other Changes" >> RELEASE_NOTES.md
-          echo "" >> RELEASE_NOTES.md
-          echo "$MERGED_PRS" | jq -r '.[] | select(all(.labels[].name; . != "feature" and . != "enhancement" and . != "bug" and . != "fix")) | "* \(.title) (#\(.number))"' >> RELEASE_NOTES.md || true
-
-          # If no PRs found, add a note
-          if [ ! -s RELEASE_NOTES.md ]; then
-            echo "No changes found in this release." >> RELEASE_NOTES.md
-          fi
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ steps.get_tag.outputs.tag }}
-          name: Release ${{ steps.get_tag.outputs.tag }}
-          body_path: RELEASE_NOTES.md
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

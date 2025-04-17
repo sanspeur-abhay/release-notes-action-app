@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Tailwind Page</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-md">
+        <nav class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="text-xl font-bold text-gray-800">My Website</div>
+                <div class="hidden md:flex space-x-6">
+                    <a href="#" class="text-gray-600 hover:text-gray-900">Home</a>
+                    <a href="#" class="text-gray-600 hover:text-gray-900">About</a>
+                    <a href="#" class="text-gray-600 hover:text-gray-900">Services</a>
+                    <a href="#" class="text-gray-600 hover:text-gray-900">Contact</a>
+                </div>
+                <button class="md:hidden">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-6 py-8">
+        <section class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-gray-900 mb-4">Welcome to My Website</h1>
+            <p class="text-gray-600 text-lg">A modern website built with Tailwind CSS</p>
+        </section>
+
+        <!-- Feature Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <!-- Card 1 -->
+            <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
+                <div class="text-3xl text-blue-500 mb-4">🚀</div>
+                <h3 class="text-xl font-semibold mb-2">Fast Performance</h3>
+                <p class="text-gray-600">Lightning fast loading times and smooth interactions.</p>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
+                <div class="text-3xl text-green-500 mb-4">🎨</div>
+                <h3 class="text-xl font-semibold mb-2">Beautiful Design</h3>
+                <p class="text-gray-600">Modern and clean design that looks great on all devices.</p>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition duration-300">
+                <div class="text-3xl text-purple-500 mb-4">⚡</div>
+                <h3 class="text-xl font-semibold mb-2">Easy to Use</h3>
+                <p class="text-gray-600">Simple and intuitive interface for the best experience.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white mt-12">
+        <div class="container mx-auto px-6 py-8">
+            <div class="text-center">
+                <p>&copy; 2024 My Website. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html> 

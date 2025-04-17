@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About Us - Modern Tailwind Page</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-md">
+        <nav class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="text-xl font-bold text-gray-800">My Website</div>
+                <div class="hidden md:flex space-x-6">
+                    <a href="index.html" class="text-gray-600 hover:text-gray-900">Home</a>
+                    <a href="about.html" class="text-blue-600 font-medium">About</a>
+                    <a href="#" class="text-gray-600 hover:text-gray-900">Services</a>
+                    <a href="#" class="text-gray-600 hover:text-gray-900">Contact</a>
+                </div>
+                <button class="md:hidden">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-6 py-8">
+        <!-- Hero Section -->
+        <section class="text-center mb-16">
+            <h1 class="text-4xl font-bold text-gray-900 mb-4">About Us</h1>
+            <p class="text-gray-600 text-lg max-w-2xl mx-auto">We're a passionate team dedicated to creating beautiful and functional web experiences using modern technologies.</p>
+        </section>
+
+        <!-- Our Story -->
+        <section class="mb-16">
+            <div class="bg-white rounded-lg shadow-md p-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">Our Story</h2>
+                <div class="prose max-w-none text-gray-600">
+                    <p class="mb-4">Founded in 2024, we started with a simple mission: to make web development more accessible and beautiful. Our journey began with a small team of passionate developers who believed in the power of modern web technologies.</p>
+                    <p>Today, we continue to push the boundaries of what's possible on the web, using cutting-edge tools like Tailwind CSS to create responsive and elegant websites.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Team Section -->
+        <section class="mb-16">
+            <h2 class="text-2xl font-bold text-gray-900 mb-8">Our Team</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Team Member 1 -->
+                <div class="bg-white rounded-lg shadow-md p-6 text-center">
+                    <div class="w-32 h-32 mx-auto mb-4 rounded-full overflow-hidden bg-gray-200">
+                        <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="Team Member" class="w-full h-full object-cover">
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">John Doe</h3>
+                    <p class="text-gray-600 mb-2">Founder & CEO</p>
+                    <p class="text-sm text-gray-500">10+ years of experience in web development and design.</p>
+                </div>
+
+                <!-- Team Member 2 -->
+                <div class="bg-white rounded-lg shadow-md p-6 text-center">
+                    <div class="w-32 h-32 mx-auto mb-4 rounded-full overflow-hidden bg-gray-200">
+                        <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="Team Member" class="w-full h-full object-cover">
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">Jane Smith</h3>
+                    <p class="text-gray-600 mb-2">Lead Designer</p>
+                    <p class="text-sm text-gray-500">Expert in UI/UX design and user experience optimization.</p>
+                </div>
+
+                <!-- Team Member 3 -->
+                <div class="bg-white rounded-lg shadow-md p-6 text-center">
+                    <div class="w-32 h-32 mx-auto mb-4 rounded-full overflow-hidden bg-gray-200">
+                        <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="Team Member" class="w-full h-full object-cover">
+                    </div>
+                    <h3 class="text-xl font-semibold mb-2">Mike Johnson</h3>
+                    <p class="text-gray-600 mb-2">Technical Lead</p>
+                    <p class="text-sm text-gray-500">Specialized in modern web frameworks and performance optimization.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Values Section -->
+        <section class="mb-16">
+            <h2 class="text-2xl font-bold text-gray-900 mb-8">Our Values</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Value 1 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="text-3xl text-blue-500 mb-4">🎯</div>
+                    <h3 class="text-xl font-semibold mb-2">Excellence</h3>
+                    <p class="text-gray-600">We strive for excellence in every project we undertake, ensuring the highest quality in our deliverables.</p>
+                </div>
+
+                <!-- Value 2 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="text-3xl text-green-500 mb-4">🤝</div>
+                    <h3 class="text-xl font-semibold mb-2">Collaboration</h3>
+                    <p class="text-gray-600">We believe in the power of teamwork and open communication with our clients and team members.</p>
+                </div>
+
+                <!-- Value 3 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="text-3xl text-purple-500 mb-4">💡</div>
+                    <h3 class="text-xl font-semibold mb-2">Innovation</h3>
+                    <p class="text-gray-600">We constantly explore new technologies and methodologies to deliver cutting-edge solutions.</p>
+                </div>
+
+                <!-- Value 4 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="text-3xl text-yellow-500 mb-4">⚡</div>
+                    <h3 class="text-xl font-semibold mb-2">Performance</h3>
+                    <p class="text-gray-600">We optimize every aspect of our work to ensure fast, efficient, and reliable results.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white mt-12">
+        <div class="container mx-auto px-6 py-8">
+            <div class="text-center">
+                <p>&copy; 2024 My Website. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html> 

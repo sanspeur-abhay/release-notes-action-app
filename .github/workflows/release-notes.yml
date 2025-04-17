@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # Required for creating releases
+      pull-requests: read # Required for reading PRs and their labels
     
     steps:
       - name: Checkout code
@@ -30,30 +31,41 @@ jobs:
           echo "tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
       
       - name: Generate release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Initialize the release notes file
+          echo "# What's Changed" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+
+          # Get merged PRs between tags
           if [ -n "${{ steps.prev_tag.outputs.tag }}" ]; then
-            echo "## What's Changed" > RELEASE_NOTES.md
-            echo "" >> RELEASE_NOTES.md
-            
-            # Features
-            echo "### ✨ Features" >> RELEASE_NOTES.md
-            git log --pretty=format:"* %s" ${{ steps.prev_tag.outputs.tag }}..${{ steps.get_tag.outputs.tag }} | grep -i "^* feat" >> RELEASE_NOTES.md || true
-            echo "" >> RELEASE_NOTES.md
-            echo "" >> RELEASE_NOTES.md
-            
-            # Bug Fixes
-            echo "### 🐛 Bug Fixes" >> RELEASE_NOTES.md
-            git log --pretty=format:"* %s" ${{ steps.prev_tag.outputs.tag }}..${{ steps.get_tag.outputs.tag }} | grep -i "^* fix" >> RELEASE_NOTES.md || true
-            echo "" >> RELEASE_NOTES.md
-            echo "" >> RELEASE_NOTES.md
-            
-            # Other Changes
-            echo "### 🔄 Other Changes" >> RELEASE_NOTES.md
-            git log --pretty=format:"* %s" ${{ steps.prev_tag.outputs.tag }}..${{ steps.get_tag.outputs.tag }} | grep -iv "^* feat\|^* fix" >> RELEASE_NOTES.md || true
+            RANGE="${{ steps.prev_tag.outputs.tag }}..${{ steps.get_tag.outputs.tag }}"
           else
-            echo "## 🎉 Initial Release" > RELEASE_NOTES.md
-            echo "" >> RELEASE_NOTES.md
-            git log --pretty=format:"* %s" ${{ steps.get_tag.outputs.tag }} >> RELEASE_NOTES.md
+            RANGE="${{ steps.get_tag.outputs.tag }}"
+          fi
+
+          # Get all PRs merged in this range
+          MERGED_PRS=$(gh pr list --search "is:merged merged:>${{ steps.prev_tag.outputs.tag }}" --json number,title,labels,mergeCommit)
+
+          # Initialize sections
+          echo "## ✨ Features" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "$MERGED_PRS" | jq -r '.[] | select(.labels[].name == "feature" or .labels[].name == "enhancement") | "* \(.title) (#\(.number))"' >> RELEASE_NOTES.md || true
+          echo "" >> RELEASE_NOTES.md
+
+          echo "## 🐛 Bug Fixes" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "$MERGED_PRS" | jq -r '.[] | select(.labels[].name == "bug" or .labels[].name == "bugfix") | "* \(.title) (#\(.number))"' >> RELEASE_NOTES.md || true
+          echo "" >> RELEASE_NOTES.md
+
+          echo "## 🔄 Other Changes" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "$MERGED_PRS" | jq -r '.[] | select(all(.labels[].name; . != "feature" and . != "enhancement" and . != "bug" and . != "fix")) | "* \(.title) (#\(.number))"' >> RELEASE_NOTES.md || true
+
+          # If no PRs found, add a note
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "No changes found in this release." >> RELEASE_NOTES.md
           fi
 
       - name: Create Release

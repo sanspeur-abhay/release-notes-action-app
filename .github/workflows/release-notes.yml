@@ -49,4 +49,3 @@ jobs:
               **Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREVIOUS_TAG...$NEXT_TAG
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-d

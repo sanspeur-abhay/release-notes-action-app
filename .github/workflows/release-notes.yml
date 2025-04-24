@@ -1,22 +1,109 @@
-name: Categorized Release Notes on Tag
+name: Generate Release Notes
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*' # Trigger on version tags
 
 jobs:
-  create_categorized_release:
+  create-release:
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
+      pull-requests: read
+      issues: read
+    
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Generate and publish categorized release
-        uses: release-drafter/release-drafter@v6
+        uses: actions/checkout@v4
         with:
-          tag: ${{ github.ref_name }}
-          config-name: release-drafter.yml
+          fetch-depth: 0
+
+      - name: Get version
+        id: get_version
+        run: |
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          echo "PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo '')" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Start release notes
+          {
+            echo "# 🚀 Release ${{ steps.get_version.outputs.VERSION }}"
+            echo
+            echo "## What's Changed"
+            echo
+
+            # Features
+            echo "### ✨ Features & Enhancements"
+            echo
+            gh pr list \
+              --repo $OWNER/$REPO \
+              --state merged \
+              --json number,title,labels,mergeCommit,body \
+              --search "label:feature label:enhancement merged:>${{ steps.get_version.outputs.PREVIOUS_TAG }}" | \
+            jq -r '.[] | "* \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"' || echo "No new features"
+            echo
+
+            # Bug Fixes
+            echo "### 🐛 Bug Fixes"
+            echo
+            gh pr list \
+              --repo $OWNER/$REPO \
+              --state merged \
+              --json number,title,labels,mergeCommit,body \
+              --search "label:bug label:bugfix merged:>${{ steps.get_version.outputs.PREVIOUS_TAG }}" | \
+            jq -r '.[] | "* \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"' || echo "No bug fixes"
+            echo
+
+            # Documentation
+            echo "### 📚 Documentation"
+            echo
+            gh pr list \
+              --repo $OWNER/$REPO \
+              --state merged \
+              --json number,title,labels,mergeCommit,body \
+              --search "label:documentation merged:>${{ steps.get_version.outputs.PREVIOUS_TAG }}" | \
+            jq -r '.[] | "* \(.title) (#\(.number))"' || echo "No documentation changes"
+            echo
+
+            # Other Changes
+            echo "### 🔄 Other Changes"
+            echo
+            gh pr list \
+              --repo $OWNER/$REPO \
+              --state merged \
+              --json number,title,labels,mergeCommit,body \
+              --search "merged:>${{ steps.get_version.outputs.PREVIOUS_TAG }} -label:feature -label:enhancement -label:bug -label:bugfix -label:documentation" | \
+            jq -r '.[] | "* \(.title) (#\(.number))"' || echo "No other changes"
+            echo
+
+            # Contributors
+            echo "## 👥 Contributors"
+            echo
+            gh pr list \
+              --repo $OWNER/$REPO \
+              --state merged \
+              --json author,mergeCommit \
+              --search "merged:>${{ steps.get_version.outputs.PREVIOUS_TAG }}" | \
+            jq -r '.[] | .author.login' | sort -u | awk '{ print "* @" $0 }'
+            echo
+
+            # Full Changelog Link
+            echo "**Full Changelog**: https://github.com/$OWNER/$REPO/compare/${{ steps.get_version.outputs.PREVIOUS_TAG }}...${{ steps.get_version.outputs.VERSION }}"
+          } > RELEASE_NOTES.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_version.outputs.VERSION }}
+          name: Release ${{ steps.get_version.outputs.VERSION }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+          generate_release_notes: false

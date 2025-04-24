@@ -17,6 +17,7 @@ jobs:
         uses: release-drafter/release-drafter@v6
         with:
           tag: ${{ github.ref_name }}
+          config-name: inline  # 👈 prevents it from looking for release-drafter.yml
           config: |
             name-template: 'v$NEXT_PATCH_VERSION'
             tag-template: 'v$NEXT_PATCH_VERSION'
@@ -28,9 +29,6 @@ jobs:
               - title: '🐛 Bug Fixes'
                 labels:
                   - 'bugfix'
-              - title: '🐛 Enhancement'
-                labels:
-                  - 'enhancement'
               - title: '🔧 Other Changes'
                 labels:
                   - 'chore'

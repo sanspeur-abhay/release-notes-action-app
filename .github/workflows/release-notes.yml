@@ -31,6 +31,17 @@ jobs:
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.repository }}
         run: |
+          # Function to fetch PRs by label
+          fetch_prs_by_label() {
+            local label=$1
+            gh pr list \
+              --repo "$OWNER/$REPO" \
+              --state merged \
+              --json number,title,labels,body,mergedAt \
+              --search "label:$label merged:${{ steps.get_version.outputs.PREVIOUS_TAG }}..HEAD" \
+              --limit 100
+          }
+
           # Start release notes
           {
             echo "# 🚀 Release ${{ steps.get_version.outputs.VERSION }}"
@@ -38,58 +49,70 @@ jobs:
             echo "## What's Changed"
             echo
 
-            # Features
+            # Features Section
             echo "### ✨ Features & Enhancements"
             echo
-            gh pr list \
-              --repo $OWNER/$REPO \
-              --state merged \
-              --json number,title,labels,mergeCommit,body \
-              --search "label:feature label:enhancement merged:>${{ steps.get_version.outputs.PREVIOUS_TAG }}" | \
-            jq -r '.[] | "* \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"' || echo "No new features"
+            {
+              # Fetch feature PRs
+              feature_prs=$(fetch_prs_by_label "feature")
+              enhancement_prs=$(fetch_prs_by_label "enhancement")
+              
+              # Combine and format feature PRs
+              echo "$feature_prs $enhancement_prs" | \
+              jq -r '.[] | "* \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"' || \
+              echo "No new features in this release"
+            }
             echo
 
-            # Bug Fixes
+            # Bug Fixes Section
             echo "### 🐛 Bug Fixes"
             echo
-            gh pr list \
-              --repo $OWNER/$REPO \
-              --state merged \
-              --json number,title,labels,mergeCommit,body \
-              --search "label:bug label:bugfix merged:>${{ steps.get_version.outputs.PREVIOUS_TAG }}" | \
-            jq -r '.[] | "* \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"' || echo "No bug fixes"
+            {
+              # Fetch bug fix PRs
+              bug_prs=$(fetch_prs_by_label "bug")
+              bugfix_prs=$(fetch_prs_by_label "bugfix")
+              
+              # Combine and format bug fix PRs
+              echo "$bug_prs $bugfix_prs" | \
+              jq -r '.[] | "* \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"' || \
+              echo "No bug fixes in this release"
+            }
             echo
 
-            # Documentation
+            # Documentation Section
             echo "### 📚 Documentation"
             echo
-            gh pr list \
-              --repo $OWNER/$REPO \
-              --state merged \
-              --json number,title,labels,mergeCommit,body \
-              --search "label:documentation merged:>${{ steps.get_version.outputs.PREVIOUS_TAG }}" | \
-            jq -r '.[] | "* \(.title) (#\(.number))"' || echo "No documentation changes"
+            {
+              docs_prs=$(fetch_prs_by_label "documentation")
+              echo "$docs_prs" | \
+              jq -r '.[] | "* \(.title) (#\(.number))"' || \
+              echo "No documentation changes in this release"
+            }
             echo
 
-            # Other Changes
+            # Other Changes Section
             echo "### 🔄 Other Changes"
             echo
-            gh pr list \
-              --repo $OWNER/$REPO \
-              --state merged \
-              --json number,title,labels,mergeCommit,body \
-              --search "merged:>${{ steps.get_version.outputs.PREVIOUS_TAG }} -label:feature -label:enhancement -label:bug -label:bugfix -label:documentation" | \
-            jq -r '.[] | "* \(.title) (#\(.number))"' || echo "No other changes"
+            {
+              gh pr list \
+                --repo "$OWNER/$REPO" \
+                --state merged \
+                --json number,title,labels \
+                --search "merged:${{ steps.get_version.outputs.PREVIOUS_TAG }}..HEAD -label:feature -label:enhancement -label:bug -label:bugfix -label:documentation" \
+                --limit 100 | \
+              jq -r '.[] | "* \(.title) (#\(.number))"' || \
+              echo "No other changes in this release"
+            }
             echo
 
-            # Contributors
+            # Contributors Section
             echo "## 👥 Contributors"
             echo
             gh pr list \
-              --repo $OWNER/$REPO \
+              --repo "$OWNER/$REPO" \
               --state merged \
-              --json author,mergeCommit \
-              --search "merged:>${{ steps.get_version.outputs.PREVIOUS_TAG }}" | \
+              --json author \
+              --search "merged:${{ steps.get_version.outputs.PREVIOUS_TAG }}..HEAD" | \
             jq -r '.[] | .author.login' | sort -u | awk '{ print "* @" $0 }'
             echo
 

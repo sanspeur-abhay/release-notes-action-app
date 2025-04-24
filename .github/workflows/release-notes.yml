@@ -28,6 +28,9 @@ jobs:
               - title: '🐛 Bug Fixes'
                 labels:
                   - 'bugfix'
+              - title: '🐛 Enhancement'
+                labels:
+                  - 'enhancement'
               - title: '🔧 Other Changes'
                 labels:
                   - 'chore'
@@ -46,3 +49,4 @@ jobs:
               **Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREVIOUS_TAG...$NEXT_TAG
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+d

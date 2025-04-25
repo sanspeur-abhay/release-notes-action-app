@@ -8,28 +8,29 @@ categories:
   - title: '🐛 Bug Fixes'
     labels:
       - 'bugfix'
+  - title: '📚 Documentation'
+    labels:
+      - 'docs'
   - title: '🧰 Maintenance'
     labels:
       - 'chore'
       - 'refactor'
-      - 'deps'
       - 'ci'
+      - 'deps'
   - title: '🧪 Tests'
     labels:
       - 'test'
-  - title: '📚 Documentation'
-    labels:
-      - 'docs'
 
 change-template: '- $TITLE (#$NUMBER)'
 no-changes-template: '- No significant changes in this release.'
 
 template: |
-  ## 📝 Release Notes
+  ## 🔥 Release Highlights
 
   $CHANGES
 
   ---
 
-  🏷️ **Tag:** `$NEXT_TAG`  
-  📦 **Compare:** [$PREVIOUS_TAG...$NEXT_TAG](https://github.com/${{ github.repository }}/compare/$PREVIOUS_TAG...$NEXT_TAG)
+  📦 **Version:** `$NEXT_TAG`  
+  🕒 **Date:** ${{ date }}
+  🔗 [Compare changes](https://github.com/${{ github.repository }}/compare/$PREVIOUS_TAG...$NEXT_TAG)

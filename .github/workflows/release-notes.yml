@@ -1,0 +1,315 @@
+name: Generate Release Notes 2025
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to create release for (e.g., v1.0.0)'
+        required: false
+        type: string
+      draft:
+        description: 'Create as draft release'
+        required: false
+        type: boolean
+        default: false
+
+permissions: {}  # Zero trust by default
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write    # Required for creating releases
+      pull-requests: read # Required for fetching PR information
+      issues: read      # Required for fetching issue information
+      security-events: read # For security advisory information
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for accurate versioning
+          fetch-tags: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup GitHub CLI
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh extension install actions/gh-actions-cache || true
+          gh auth status || gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.version }}" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          
+          # Validate semantic version
+          if [[ ! $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.]+)?(\+[a-zA-Z0-9\.]+)?$ ]]; then
+            echo "Error: Version $VERSION does not follow semantic versioning (vX.Y.Z)"
+            exit 1
+          fi
+          
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Get previous version tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo '')
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found, using first commit"
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+          echo "PREVIOUS_TAG=$PREV_TAG" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: release-notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Enhanced PR fetching function with retries and error handling
+          fetch_prs_by_label() {
+            local label=$1
+            local max_retries=3
+            local retry_count=0
+            local result
+            
+            while [ $retry_count -lt $max_retries ]; do
+              echo "Fetching PRs with label '$label' (attempt $((retry_count + 1)))"
+              result=$(gh pr list \
+                --repo "${{ github.repository }}" \
+                --state merged \
+                --json number,title,labels,body,mergedAt,author \
+                --search "label:$label merged:${{ steps.version.outputs.PREVIOUS_TAG }}..HEAD" \
+                --limit 100 2>/dev/null || echo "[]")
+              
+              if [ "$result" != "[]" ] || [ $retry_count -eq $((max_retries - 1)) ]; then
+                echo "$result"
+                break
+              fi
+              
+              retry_count=$((retry_count + 1))
+              sleep 2
+            done
+          }
+
+          # Start generating release notes
+          {
+            echo "# 🚀 Release ${{ steps.version.outputs.VERSION }}"
+            echo
+            echo "## Release Highlights"
+            echo
+            echo "This release includes new features, improvements, and bug fixes to enhance your experience."
+            echo
+
+            # Security Updates Section
+            echo "## 🔒 Security Updates"
+            echo
+            {
+              security_prs=$(fetch_prs_by_label "security")
+              if [ "$security_prs" != "[]" ] && [ -n "$security_prs" ]; then
+                echo "$security_prs" | \
+                jq -r '.[] | "* 🔐 \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"'
+              else
+                echo "No security updates in this release"
+              fi
+            }
+            echo
+
+            # Breaking Changes Section
+            echo "## ⚠️ Breaking Changes"
+            echo
+            {
+              breaking_prs=$(fetch_prs_by_label "breaking-change")
+              if [ "$breaking_prs" != "[]" ] && [ -n "$breaking_prs" ]; then
+                echo "$breaking_prs" | \
+                jq -r '.[] | "* ⚠️ \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"'
+              else
+                echo "No breaking changes in this release"
+              fi
+            }
+            echo
+
+            # Features Section
+            echo "## ✨ New Features"
+            echo
+            {
+              feature_prs=$(fetch_prs_by_label "feature")
+              enhancement_prs=$(fetch_prs_by_label "enhancement")
+              
+              if { [ "$feature_prs" != "[]" ] && [ -n "$feature_prs" ]; } || \
+                 { [ "$enhancement_prs" != "[]" ] && [ -n "$enhancement_prs" ]; }; then
+                {
+                  echo "$feature_prs"
+                  echo "$enhancement_prs"
+                } | jq -s 'add // []' | \
+                jq -r '.[] | "* ✨ \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"'
+              else
+                echo "No new features in this release"
+              fi
+            }
+            echo
+
+            # Bug Fixes Section
+            echo "## 🐛 Bug Fixes"
+            echo
+            {
+              bug_prs=$(fetch_prs_by_label "bug")
+              bugfix_prs=$(fetch_prs_by_label "bugfix")
+              
+              if { [ "$bug_prs" != "[]" ] && [ -n "$bug_prs" ]; } || \
+                 { [ "$bugfix_prs" != "[]" ] && [ -n "$bugfix_prs" ]; }; then
+                {
+                  echo "$bug_prs"
+                  echo "$bugfix_prs"
+                } | jq -s 'add // []' | \
+                jq -r '.[] | "* 🐛 \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"'
+              else
+                echo "No bug fixes in this release"
+              fi
+            }
+            echo
+
+            # Performance Improvements Section
+            echo "## ⚡ Performance Improvements"
+            echo
+            {
+              perf_prs=$(fetch_prs_by_label "performance")
+              if [ "$perf_prs" != "[]" ] && [ -n "$perf_prs" ]; then
+                echo "$perf_prs" | \
+                jq -r '.[] | "* ⚡ \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"'
+              else
+                echo "No performance improvements in this release"
+              fi
+            }
+            echo
+
+            # Documentation Updates Section
+            echo "## 📚 Documentation"
+            echo
+            {
+              docs_prs=$(fetch_prs_by_label "documentation")
+              if [ "$docs_prs" != "[]" ] && [ -n "$docs_prs" ]; then
+                echo "$docs_prs" | \
+                jq -r '.[] | "* 📝 \(.title) (#\(.number))"'
+              else
+                echo "No documentation changes in this release"
+              fi
+            }
+            echo
+
+            # Dependencies Section
+            echo "## 📦 Dependencies"
+            echo
+            {
+              deps_prs=$(fetch_prs_by_label "dependencies")
+              if [ "$deps_prs" != "[]" ] && [ -n "$deps_prs" ]; then
+                echo "$deps_prs" | \
+                jq -r '.[] | "* 📦 \(.title) (#\(.number))"'
+              else
+                echo "No dependency updates in this release"
+              fi
+            }
+            echo
+
+            # Other Changes Section
+            echo "## 🔄 Other Changes"
+            echo
+            {
+              other_prs=$(gh pr list \
+                --repo "${{ github.repository }}" \
+                --state merged \
+                --json number,title,labels,author \
+                --search "merged:${{ steps.version.outputs.PREVIOUS_TAG }}..HEAD -label:feature -label:enhancement -label:bug -label:bugfix -label:documentation -label:dependencies -label:security -label:breaking-change -label:performance" \
+                --limit 100 || echo "[]")
+              
+              if [ "$other_prs" != "[]" ] && [ -n "$other_prs" ]; then
+                echo "$other_prs" | \
+                jq -r '.[] | "* \(.title) (#\(.number))"'
+              else
+                echo "No other changes in this release"
+              fi
+            }
+            echo
+
+            # Contributors Section
+            echo "## 👥 Contributors"
+            echo
+            echo "We'd like to thank all the contributors who worked on this release!"
+            echo
+            {
+              contributors=$(gh pr list \
+                --repo "${{ github.repository }}" \
+                --state merged \
+                --json author \
+                --search "merged:${{ steps.version.outputs.PREVIOUS_TAG }}..HEAD" || echo "[]")
+              
+              if [ "$contributors" != "[]" ] && [ -n "$contributors" ]; then
+                echo "$contributors" | \
+                jq -r '.[] | .author.login' | sort -u | \
+                while read -r contributor; do
+                  echo "* [@$contributor](https://github.com/$contributor)"
+                done
+              else
+                echo "No contributors in this release"
+              fi
+            }
+            echo
+
+            # Installation & Upgrade Notes
+            echo "## 📥 Installation & Upgrade Notes"
+            echo
+            echo "Please review our [installation guide](../../docs/installation.md) for detailed instructions."
+            echo
+            echo "### Quick Install"
+            echo "\`\`\`bash"
+            echo "# Using npm"
+            echo "npm install your-package@${{ steps.version.outputs.VERSION }}"
+            echo
+            echo "# Using yarn"
+            echo "yarn add your-package@${{ steps.version.outputs.VERSION }}"
+            echo "\`\`\`"
+            echo
+
+            # Full Changelog Link
+            echo "## 📋 Full Changelog"
+            echo
+            echo "For a complete list of changes, see the [full changelog](https://github.com/${{ github.repository }}/compare/${{ steps.version.outputs.PREVIOUS_TAG }}...${{ steps.version.outputs.VERSION }})"
+            echo
+
+            # Support & Feedback
+            echo "## 💬 Support & Feedback"
+            echo
+            echo "* 🐛 Report bugs by opening a [GitHub issue](https://github.com/${{ github.repository }}/issues/new?template=bug_report.md)"
+            echo "* 💡 Request features by opening a [GitHub issue](https://github.com/${{ github.repository }}/issues/new?template=feature_request.md)"
+            echo "* 💬 Join our [Discord community](https://discord.gg/your-discord) for questions and discussions"
+
+          } > RELEASE_NOTES.md
+
+          # Debug output
+          echo "Generated release notes:"
+          cat RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: Release ${{ steps.version.outputs.VERSION }}
+          body_path: RELEASE_NOTES.md
+          draft: ${{ github.event.inputs.draft || false }}
+          prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          generate_release_notes: false
+          discussion_category_name: Releases  # If you have GitHub Discussions enabled
+
+      - name: Update Release Documentation
+        if: success()
+        run: |
+          echo "Release ${{ steps.version.outputs.VERSION }} created successfully!"
+          echo "View the release at: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.VERSION }}"

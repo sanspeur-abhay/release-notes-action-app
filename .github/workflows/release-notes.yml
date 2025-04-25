@@ -25,13 +25,12 @@ jobs:
       contents: write    # Required for creating releases
       pull-requests: read # Required for fetching PR information
       issues: read      # Required for fetching issue information
-      security-events: read # For security advisory information
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for accurate versioning
+          fetch-depth: 0
           fetch-tags: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -39,7 +38,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh extension install actions/gh-actions-cache || true
           gh auth status || gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Determine version
@@ -73,50 +71,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Enhanced PR fetching function with retries and error handling
+          # Function to fetch PRs by label
           fetch_prs_by_label() {
             local label=$1
-            local max_retries=3
-            local retry_count=0
-            local result="[]"
-            
-            while [ $retry_count -lt $max_retries ]; do
-              echo "Fetching PRs with label '$label' (attempt $((retry_count + 1)))"
-              result=$(gh pr list \
-                --repo "${{ github.repository }}" \
-                --state merged \
-                --json number,title,labels,body,mergedAt,author \
-                --search "label:$label merged:${{ steps.version.outputs.PREVIOUS_TAG }}..HEAD" \
-                --limit 100 2>/dev/null || echo "[]")
-              
-              if [ "$result" != "[]" ]; then
-                break
-              fi
-              
-              retry_count=$((retry_count + 1))
-              sleep 2
-            done
-            
-            echo "$result"
+            gh pr list \
+              --repo "${{ github.repository }}" \
+              --state merged \
+              --json number,title,body \
+              --search "label:$label merged:${{ steps.version.outputs.PREVIOUS_TAG }}..HEAD" \
+              --limit 100 2>/dev/null || echo "[]"
           }
 
           # Function to format PR entries
           format_prs() {
             local prs=$1
             local emoji=$2
-            if [ "$prs" != "[]" ] && [ -n "$prs" ]; then
-              echo "$prs" | jq -r --arg emoji "$emoji" '.[] | "* \($emoji) \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"'
-            fi
-          }
-
-          # Function to combine PR results
-          combine_prs() {
-            local prs1=$1
-            local prs2=$2
-            if [ "$prs1" = "[]" ] && [ "$prs2" = "[]" ]; then
-              echo "[]"
-            else
-              jq -s 'add // []' <(echo "$prs1") <(echo "$prs2")
+            if [ -n "$prs" ] && [ "$prs" != "[]" ]; then
+              echo "$prs" | jq -r --arg emoji "$emoji" '.[] | "* \($emoji) \(.title) (#\(.number))"'
             fi
           }
 
@@ -124,41 +95,15 @@ jobs:
           {
             echo "# 🚀 Release ${{ steps.version.outputs.VERSION }}"
             echo
-            echo "## Release Highlights"
-            echo
-            echo "This release includes new features, improvements, and bug fixes to enhance your experience."
-            echo
-
-            # Security Updates Section
-            echo "## 🔒 Security Updates"
-            echo
-            security_prs=$(fetch_prs_by_label "security")
-            if [ "$security_prs" != "[]" ]; then
-              format_prs "$security_prs" "🔐"
-            else
-              echo "No security updates in this release"
-            fi
-            echo
-
-            # Breaking Changes Section
-            echo "## ⚠️ Breaking Changes"
-            echo
-            breaking_prs=$(fetch_prs_by_label "breaking-change")
-            if [ "$breaking_prs" != "[]" ]; then
-              format_prs "$breaking_prs" "⚠️"
-            else
-              echo "No breaking changes in this release"
-            fi
-            echo
 
             # Features Section
-            echo "## ✨ New Features"
+            echo "## ✨ Features & Enhancements"
             echo
-            feature_prs=$(fetch_prs_by_label "feature")
-            enhancement_prs=$(fetch_prs_by_label "enhancement")
-            combined_features=$(combine_prs "$feature_prs" "$enhancement_prs")
-            if [ "$combined_features" != "[]" ]; then
-              format_prs "$combined_features" "✨"
+            features=$(fetch_prs_by_label "feature")
+            enhancements=$(fetch_prs_by_label "enhancement")
+            if [ "$features" != "[]" ] || [ "$enhancements" != "[]" ]; then
+              format_prs "$features" "✨"
+              format_prs "$enhancements" "✨"
             else
               echo "No new features in this release"
             fi
@@ -167,46 +112,13 @@ jobs:
             # Bug Fixes Section
             echo "## 🐛 Bug Fixes"
             echo
-            bug_prs=$(fetch_prs_by_label "bug")
-            bugfix_prs=$(fetch_prs_by_label "bugfix")
-            combined_bugs=$(combine_prs "$bug_prs" "$bugfix_prs")
-            if [ "$combined_bugs" != "[]" ]; then
-              format_prs "$combined_bugs" "🐛"
+            bugs=$(fetch_prs_by_label "bug")
+            bugfixes=$(fetch_prs_by_label "bugfix")
+            if [ "$bugs" != "[]" ] || [ "$bugfixes" != "[]" ]; then
+              format_prs "$bugs" "🐛"
+              format_prs "$bugfixes" "🐛"
             else
               echo "No bug fixes in this release"
-            fi
-            echo
-
-            # Performance Improvements Section
-            echo "## ⚡ Performance Improvements"
-            echo
-            perf_prs=$(fetch_prs_by_label "performance")
-            if [ "$perf_prs" != "[]" ]; then
-              format_prs "$perf_prs" "⚡"
-            else
-              echo "No performance improvements in this release"
-            fi
-            echo
-
-            # Documentation Updates Section
-            echo "## 📚 Documentation"
-            echo
-            docs_prs=$(fetch_prs_by_label "documentation")
-            if [ "$docs_prs" != "[]" ]; then
-              format_prs "$docs_prs" "📝"
-            else
-              echo "No documentation changes in this release"
-            fi
-            echo
-
-            # Dependencies Section
-            echo "## 📦 Dependencies"
-            echo
-            deps_prs=$(fetch_prs_by_label "dependencies")
-            if [ "$deps_prs" != "[]" ]; then
-              format_prs "$deps_prs" "📦"
-            else
-              echo "No dependency updates in this release"
             fi
             echo
 
@@ -216,8 +128,8 @@ jobs:
             other_prs=$(gh pr list \
               --repo "${{ github.repository }}" \
               --state merged \
-              --json number,title,labels,author \
-              --search "merged:${{ steps.version.outputs.PREVIOUS_TAG }}..HEAD -label:feature -label:enhancement -label:bug -label:bugfix -label:documentation -label:dependencies -label:security -label:breaking-change -label:performance" \
+              --json number,title \
+              --search "merged:${{ steps.version.outputs.PREVIOUS_TAG }}..HEAD -label:feature -label:enhancement -label:bug -label:bugfix" \
               --limit 100 || echo "[]")
             
             if [ "$other_prs" != "[]" ]; then
@@ -227,32 +139,9 @@ jobs:
             fi
             echo
 
-            # Contributors Section
-            echo "## 👥 Contributors"
-            echo
-            echo "We'd like to thank all the contributors who worked on this release!"
-            echo
-            contributors=$(gh pr list \
-              --repo "${{ github.repository }}" \
-              --state merged \
-              --json author \
-              --search "merged:${{ steps.version.outputs.PREVIOUS_TAG }}..HEAD" || echo "[]")
-            
-            if [ "$contributors" != "[]" ]; then
-              echo "$contributors" | \
-              jq -r '.[] | .author.login' | sort -u | \
-              while read -r contributor; do
-                echo "* [@$contributor](https://github.com/$contributor)"
-              done
-            else
-              echo "No contributors in this release"
-            fi
-            echo
-
             # Full Changelog Link
-            echo "## 📋 Full Changelog"
-            echo
-            echo "For a complete list of changes, see the [full changelog](https://github.com/${{ github.repository }}/compare/${{ steps.version.outputs.PREVIOUS_TAG }}...${{ steps.version.outputs.VERSION }})"
+            echo "---"
+            echo "[Full Changelog](https://github.com/${{ github.repository }}/compare/${{ steps.version.outputs.PREVIOUS_TAG }}...${{ steps.version.outputs.VERSION }})"
 
           } > RELEASE_NOTES.md
 
@@ -270,7 +159,6 @@ jobs:
           prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
           token: ${{ secrets.GITHUB_TOKEN }}
           generate_release_notes: false
-          discussion_category_name: Releases  # If you have GitHub Discussions enabled
 
       - name: Update Release Documentation
         if: success()

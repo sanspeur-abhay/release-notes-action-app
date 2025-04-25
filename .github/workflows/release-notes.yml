@@ -78,7 +78,7 @@ jobs:
             local label=$1
             local max_retries=3
             local retry_count=0
-            local result
+            local result="[]"
             
             while [ $retry_count -lt $max_retries ]; do
               echo "Fetching PRs with label '$label' (attempt $((retry_count + 1)))"
@@ -89,14 +89,35 @@ jobs:
                 --search "label:$label merged:${{ steps.version.outputs.PREVIOUS_TAG }}..HEAD" \
                 --limit 100 2>/dev/null || echo "[]")
               
-              if [ "$result" != "[]" ] || [ $retry_count -eq $((max_retries - 1)) ]; then
-                echo "$result"
+              if [ "$result" != "[]" ]; then
                 break
               fi
               
               retry_count=$((retry_count + 1))
               sleep 2
             done
+            
+            echo "$result"
+          }
+
+          # Function to format PR entries
+          format_prs() {
+            local prs=$1
+            local emoji=$2
+            if [ "$prs" != "[]" ] && [ -n "$prs" ]; then
+              echo "$prs" | jq -r --arg emoji "$emoji" '.[] | "* \($emoji) \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"'
+            fi
+          }
+
+          # Function to combine PR results
+          combine_prs() {
+            local prs1=$1
+            local prs2=$2
+            if [ "$prs1" = "[]" ] && [ "$prs2" = "[]" ]; then
+              echo "[]"
+            else
+              jq -s 'add // []' <(echo "$prs1") <(echo "$prs2")
+            fi
           }
 
           # Start generating release notes
@@ -111,131 +132,99 @@ jobs:
             # Security Updates Section
             echo "## 🔒 Security Updates"
             echo
-            {
-              security_prs=$(fetch_prs_by_label "security")
-              if [ "$security_prs" != "[]" ] && [ -n "$security_prs" ]; then
-                echo "$security_prs" | \
-                jq -r '.[] | "* 🔐 \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"'
-              else
-                echo "No security updates in this release"
-              fi
-            }
+            security_prs=$(fetch_prs_by_label "security")
+            if [ "$security_prs" != "[]" ]; then
+              format_prs "$security_prs" "🔐"
+            else
+              echo "No security updates in this release"
+            fi
             echo
 
             # Breaking Changes Section
             echo "## ⚠️ Breaking Changes"
             echo
-            {
-              breaking_prs=$(fetch_prs_by_label "breaking-change")
-              if [ "$breaking_prs" != "[]" ] && [ -n "$breaking_prs" ]; then
-                echo "$breaking_prs" | \
-                jq -r '.[] | "* ⚠️ \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"'
-              else
-                echo "No breaking changes in this release"
-              fi
-            }
+            breaking_prs=$(fetch_prs_by_label "breaking-change")
+            if [ "$breaking_prs" != "[]" ]; then
+              format_prs "$breaking_prs" "⚠️"
+            else
+              echo "No breaking changes in this release"
+            fi
             echo
 
             # Features Section
             echo "## ✨ New Features"
             echo
-            {
-              feature_prs=$(fetch_prs_by_label "feature")
-              enhancement_prs=$(fetch_prs_by_label "enhancement")
-              
-              if { [ "$feature_prs" != "[]" ] && [ -n "$feature_prs" ]; } || \
-                 { [ "$enhancement_prs" != "[]" ] && [ -n "$enhancement_prs" ]; }; then
-                {
-                  echo "$feature_prs"
-                  echo "$enhancement_prs"
-                } | jq -s 'add // []' | \
-                jq -r '.[] | "* ✨ \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"'
-              else
-                echo "No new features in this release"
-              fi
-            }
+            feature_prs=$(fetch_prs_by_label "feature")
+            enhancement_prs=$(fetch_prs_by_label "enhancement")
+            combined_features=$(combine_prs "$feature_prs" "$enhancement_prs")
+            if [ "$combined_features" != "[]" ]; then
+              format_prs "$combined_features" "✨"
+            else
+              echo "No new features in this release"
+            fi
             echo
 
             # Bug Fixes Section
             echo "## 🐛 Bug Fixes"
             echo
-            {
-              bug_prs=$(fetch_prs_by_label "bug")
-              bugfix_prs=$(fetch_prs_by_label "bugfix")
-              
-              if { [ "$bug_prs" != "[]" ] && [ -n "$bug_prs" ]; } || \
-                 { [ "$bugfix_prs" != "[]" ] && [ -n "$bugfix_prs" ]; }; then
-                {
-                  echo "$bug_prs"
-                  echo "$bugfix_prs"
-                } | jq -s 'add // []' | \
-                jq -r '.[] | "* 🐛 \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"'
-              else
-                echo "No bug fixes in this release"
-              fi
-            }
+            bug_prs=$(fetch_prs_by_label "bug")
+            bugfix_prs=$(fetch_prs_by_label "bugfix")
+            combined_bugs=$(combine_prs "$bug_prs" "$bugfix_prs")
+            if [ "$combined_bugs" != "[]" ]; then
+              format_prs "$combined_bugs" "🐛"
+            else
+              echo "No bug fixes in this release"
+            fi
             echo
 
             # Performance Improvements Section
             echo "## ⚡ Performance Improvements"
             echo
-            {
-              perf_prs=$(fetch_prs_by_label "performance")
-              if [ "$perf_prs" != "[]" ] && [ -n "$perf_prs" ]; then
-                echo "$perf_prs" | \
-                jq -r '.[] | "* ⚡ \(.title) (#\(.number))\n  * \(.body | split("\n")[0] // "")"'
-              else
-                echo "No performance improvements in this release"
-              fi
-            }
+            perf_prs=$(fetch_prs_by_label "performance")
+            if [ "$perf_prs" != "[]" ]; then
+              format_prs "$perf_prs" "⚡"
+            else
+              echo "No performance improvements in this release"
+            fi
             echo
 
             # Documentation Updates Section
             echo "## 📚 Documentation"
             echo
-            {
-              docs_prs=$(fetch_prs_by_label "documentation")
-              if [ "$docs_prs" != "[]" ] && [ -n "$docs_prs" ]; then
-                echo "$docs_prs" | \
-                jq -r '.[] | "* 📝 \(.title) (#\(.number))"'
-              else
-                echo "No documentation changes in this release"
-              fi
-            }
+            docs_prs=$(fetch_prs_by_label "documentation")
+            if [ "$docs_prs" != "[]" ]; then
+              format_prs "$docs_prs" "📝"
+            else
+              echo "No documentation changes in this release"
+            fi
             echo
 
             # Dependencies Section
             echo "## 📦 Dependencies"
             echo
-            {
-              deps_prs=$(fetch_prs_by_label "dependencies")
-              if [ "$deps_prs" != "[]" ] && [ -n "$deps_prs" ]; then
-                echo "$deps_prs" | \
-                jq -r '.[] | "* 📦 \(.title) (#\(.number))"'
-              else
-                echo "No dependency updates in this release"
-              fi
-            }
+            deps_prs=$(fetch_prs_by_label "dependencies")
+            if [ "$deps_prs" != "[]" ]; then
+              format_prs "$deps_prs" "📦"
+            else
+              echo "No dependency updates in this release"
+            fi
             echo
 
             # Other Changes Section
             echo "## 🔄 Other Changes"
             echo
-            {
-              other_prs=$(gh pr list \
-                --repo "${{ github.repository }}" \
-                --state merged \
-                --json number,title,labels,author \
-                --search "merged:${{ steps.version.outputs.PREVIOUS_TAG }}..HEAD -label:feature -label:enhancement -label:bug -label:bugfix -label:documentation -label:dependencies -label:security -label:breaking-change -label:performance" \
-                --limit 100 || echo "[]")
-              
-              if [ "$other_prs" != "[]" ] && [ -n "$other_prs" ]; then
-                echo "$other_prs" | \
-                jq -r '.[] | "* \(.title) (#\(.number))"'
-              else
-                echo "No other changes in this release"
-              fi
-            }
+            other_prs=$(gh pr list \
+              --repo "${{ github.repository }}" \
+              --state merged \
+              --json number,title,labels,author \
+              --search "merged:${{ steps.version.outputs.PREVIOUS_TAG }}..HEAD -label:feature -label:enhancement -label:bug -label:bugfix -label:documentation -label:dependencies -label:security -label:breaking-change -label:performance" \
+              --limit 100 || echo "[]")
+            
+            if [ "$other_prs" != "[]" ]; then
+              echo "$other_prs" | jq -r '.[] | "* \(.title) (#\(.number))"'
+            else
+              echo "No other changes in this release"
+            fi
             echo
 
             # Contributors Section
@@ -243,52 +232,27 @@ jobs:
             echo
             echo "We'd like to thank all the contributors who worked on this release!"
             echo
-            {
-              contributors=$(gh pr list \
-                --repo "${{ github.repository }}" \
-                --state merged \
-                --json author \
-                --search "merged:${{ steps.version.outputs.PREVIOUS_TAG }}..HEAD" || echo "[]")
-              
-              if [ "$contributors" != "[]" ] && [ -n "$contributors" ]; then
-                echo "$contributors" | \
-                jq -r '.[] | .author.login' | sort -u | \
-                while read -r contributor; do
-                  echo "* [@$contributor](https://github.com/$contributor)"
-                done
-              else
-                echo "No contributors in this release"
-              fi
-            }
-            echo
-
-            # Installation & Upgrade Notes
-            echo "## 📥 Installation & Upgrade Notes"
-            echo
-            echo "Please review our [installation guide](../../docs/installation.md) for detailed instructions."
-            echo
-            echo "### Quick Install"
-            echo "\`\`\`bash"
-            echo "# Using npm"
-            echo "npm install your-package@${{ steps.version.outputs.VERSION }}"
-            echo
-            echo "# Using yarn"
-            echo "yarn add your-package@${{ steps.version.outputs.VERSION }}"
-            echo "\`\`\`"
+            contributors=$(gh pr list \
+              --repo "${{ github.repository }}" \
+              --state merged \
+              --json author \
+              --search "merged:${{ steps.version.outputs.PREVIOUS_TAG }}..HEAD" || echo "[]")
+            
+            if [ "$contributors" != "[]" ]; then
+              echo "$contributors" | \
+              jq -r '.[] | .author.login' | sort -u | \
+              while read -r contributor; do
+                echo "* [@$contributor](https://github.com/$contributor)"
+              done
+            else
+              echo "No contributors in this release"
+            fi
             echo
 
             # Full Changelog Link
             echo "## 📋 Full Changelog"
             echo
             echo "For a complete list of changes, see the [full changelog](https://github.com/${{ github.repository }}/compare/${{ steps.version.outputs.PREVIOUS_TAG }}...${{ steps.version.outputs.VERSION }})"
-            echo
-
-            # Support & Feedback
-            echo "## 💬 Support & Feedback"
-            echo
-            echo "* 🐛 Report bugs by opening a [GitHub issue](https://github.com/${{ github.repository }}/issues/new?template=bug_report.md)"
-            echo "* 💡 Request features by opening a [GitHub issue](https://github.com/${{ github.repository }}/issues/new?template=feature_request.md)"
-            echo "* 💬 Join our [Discord community](https://discord.gg/your-discord) for questions and discussions"
 
           } > RELEASE_NOTES.md
 

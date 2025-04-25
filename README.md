@@ -57,4 +57,13 @@ The action will automatically create a release with all commit messages since th
 
 ## License
 
-Feel free to use this template for your personal or commercial projects. 
+Feel free to use this template for your personal or commercial projects.
+
+# Release Notes Action App
+
+A GitHub Action to automatically generate release notes from pull requests.
+
+## Features
+- Automatically generates release notes from merged PRs
+- Categorizes changes into features and bug fixes
+- Simple and easy to use 
